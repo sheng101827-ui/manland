@@ -1,5 +1,6 @@
 package com.example.sens.controller.admin;
 
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.example.sens.controller.common.BaseController;
 import com.example.sens.dto.JsonResult;
@@ -15,9 +16,13 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 
+import javax.annotation.PostConstruct;
 import java.text.DateFormat;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
+import java.util.Calendar;
+import java.util.Date;
+import java.util.List;
 
 /**
  * <pre>
@@ -200,5 +205,39 @@ public class OrderController extends BaseController {
         return "admin/admin_finance";
     }
 
+
+    @PostConstruct
+    public void autoCancelExpiredOrders() {
+        new Thread(() -> {
+            while (true) {
+                try {
+                    Calendar calendar = Calendar.getInstance();
+                    calendar.add(Calendar.HOUR_OF_DAY, -24);
+                    Date twentyFourHoursAgo = calendar.getTime();
+
+                    QueryWrapper<Order> queryWrapper = new QueryWrapper<>();
+                    queryWrapper.eq("status", OrderStatusEnum.NOT_PAY.getCode());
+                    queryWrapper.le("create_time", twentyFourHoursAgo);
+
+                    List<Order> expiredOrders = orderService.findAll(queryWrapper);
+                    if (expiredOrders != null && !expiredOrders.isEmpty()) {
+                        for (Order order : expiredOrders) {
+                            order.setStatus(OrderStatusEnum.CLOSED.getCode());
+                            orderService.update(order);
+                            log.info("自动取消过期订单，订单ID：{}", order.getId());
+                        }
+                    }
+
+                    Thread.sleep(1000);
+                } catch (InterruptedException e) {
+                    log.error("自动取消订单线程被中断", e);
+                    Thread.currentThread().interrupt();
+                    break;
+                } catch (Exception e) {
+                    log.error("自动取消订单异常", e);
+                }
+            }
+        }).start();
+    }
 
 }
