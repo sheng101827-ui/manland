@@ -35,4 +35,11 @@ public interface OrderService extends BaseService<Order, Long> {
      */
     Order findByPostId(Long postId);
 
+    /**
+     * 退租并退还押金
+     * @param orderId
+     * @return
+     */
+    String refund(Long orderId);
+
 }
