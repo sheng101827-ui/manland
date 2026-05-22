@@ -126,7 +126,7 @@
         UPDATE t_order
         SET status = 3
         WHERE
-        create_time &lt; SUBDATE( now( ), INTERVAL + 10 MINUTE ) AND status = 0 AND del_flag = 0
+        create_time &lt; SUBDATE( now( ), INTERVAL 24 HOUR ) AND status = 0 AND del_flag = 0
     </update>
 
-
+</mapper>

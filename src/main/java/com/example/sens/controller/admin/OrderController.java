@@ -5,6 +5,7 @@ import com.example.sens.controller.common.BaseController;
 import com.example.sens.dto.JsonResult;
 import com.example.sens.entity.Order;
 import com.example.sens.enums.OrderStatusEnum;
+import com.example.sens.mapper.OrderMapper;
 import com.example.sens.service.OrderService;
 import com.example.sens.util.PageUtil;
 import lombok.extern.slf4j.Slf4j;
@@ -15,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 
+import javax.annotation.PostConstruct;
 import java.text.DateFormat;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
@@ -31,6 +33,37 @@ public class OrderController extends BaseController {
 
     @Autowired
     private OrderService orderService;
+
+    @Autowired
+    private OrderMapper orderMapper;
+
+    @PostConstruct
+    public void startOrderAutoCloseTask() {
+        Thread thread = new Thread(() -> {
+            while (true) {
+                try {
+                    Integer count = orderMapper.updateOverDueOrder();
+                    if (count != null && count > 0) {
+                        log.info("自动取消超时未支付订单数量：{}", count);
+                    }
+                    Thread.sleep(1000L);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    return;
+                } catch (Exception e) {
+                    log.error("自动取消超时未支付订单失败", e);
+                    try {
+                        Thread.sleep(1000L);
+                    } catch (InterruptedException interruptedException) {
+                        Thread.currentThread().interrupt();
+                        return;
+                    }
+                }
+            }
+        }, "order-auto-close-thread");
+        thread.setDaemon(true);
+        thread.start();
+    }
 
     /**
      * 查询所有订单并渲染order页面
@@ -146,7 +179,6 @@ public class OrderController extends BaseController {
     @ResponseBody
     @Transactional
     public JsonResult close(@RequestParam("id") Long id) {
-        // 修改订单状态
         Order order = orderService.get(id);
         if (order == null) {
             return JsonResult.error("订单不存在");
@@ -185,7 +217,6 @@ public class OrderController extends BaseController {
             orderCondition.setEndDate(dateFormat.parse(endDate));
         }
         if (loginUserIsUser()) {
-            // 用户
             orderCondition.setUserId(getLoginUserId());
         }
         orderPage = orderService.findAll(orderCondition, page);
