@@ -15,6 +15,10 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import javax.annotation.PostConstruct;
+import java.util.Date;
+import java.util.List;
 import java.text.DateFormat;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
@@ -31,6 +35,34 @@ public class OrderController extends BaseController {
 
     @Autowired
     private OrderService orderService;
+
+    @PostConstruct
+    public void cancelOverdueOrders() {
+        new Thread(() -> {
+            while (true) {
+                try {
+                    QueryWrapper<Order> queryWrapper = new QueryWrapper<>();
+                    queryWrapper.eq("status", OrderStatusEnum.NOT_PAY.getCode());
+                    queryWrapper.le("create_time", new Date(System.currentTimeMillis() - 24 * 60 * 60 * 1000L));
+                    List<Order> orders = orderService.findAll(queryWrapper);
+                    if (orders != null && !orders.isEmpty()) {
+                        for (Order order : orders) {
+                            order.setStatus(OrderStatusEnum.CLOSED.getCode());
+                            orderService.update(order);
+                            log.info("订单超过24小时未支付自动取消, orderId: {}", order.getId());
+                        }
+                    }
+                    Thread.sleep(1000);
+                } catch (InterruptedException e) {
+                    log.error("取消过期订单线程被中断", e);
+                    Thread.currentThread().interrupt();
+                    break;
+                } catch (Exception e) {
+                    log.error("取消过期订单异常", e);
+                }
+            }
+        }).start();
+    }
 
     /**
      * 查询所有订单并渲染order页面
