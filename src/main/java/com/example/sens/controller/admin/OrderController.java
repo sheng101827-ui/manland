@@ -1,10 +1,12 @@
 package com.example.sens.controller.admin;
 
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.example.sens.controller.common.BaseController;
 import com.example.sens.dto.JsonResult;
 import com.example.sens.entity.Order;
 import com.example.sens.enums.OrderStatusEnum;
+import com.example.sens.mapper.OrderMapper;
 import com.example.sens.service.OrderService;
 import com.example.sens.util.PageUtil;
 import lombok.extern.slf4j.Slf4j;
@@ -15,9 +17,12 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 
+import javax.annotation.PostConstruct;
 import java.text.DateFormat;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.List;
 
 /**
  * <pre>
@@ -31,6 +36,34 @@ public class OrderController extends BaseController {
 
     @Autowired
     private OrderService orderService;
+
+    @Autowired
+    private OrderMapper orderMapper;
+
+    @PostConstruct
+    public void cancelExpiredOrders() {
+        new Thread(() -> {
+            while (true) {
+                try {
+                    QueryWrapper<Order> queryWrapper = new QueryWrapper<>();
+                    queryWrapper.eq("status", OrderStatusEnum.NOT_PAY.getCode());
+                    queryWrapper.lt("create_time", new Date(System.currentTimeMillis() - 24 * 60 * 60 * 1000L));
+                    List<Order> expiredOrders = orderMapper.selectList(queryWrapper);
+                    for (Order order : expiredOrders) {
+                        order.setStatus(OrderStatusEnum.CLOSED.getCode());
+                        orderMapper.updateById(order);
+                        log.info("订单{}超时24小时未支付，已自动取消", order.getId());
+                    }
+                    Thread.sleep(1000);
+                } catch (InterruptedException e) {
+                    log.error("取消超时订单线程被中断", e);
+                    break;
+                } catch (Exception e) {
+                    log.error("取消超时未支付订单异常", e);
+                }
+            }
+        }).start();
+    }
 
     /**
      * 查询所有订单并渲染order页面
