@@ -1,0 +1,16 @@
+diff --git a/src/main/resources/static/js/app.js b/src/main/resources/static/js/app.js
+index 5df342f..3da6331 100755
+--- a/src/main/resources/static/js/app.js
++++ b/src/main/resources/static/js/app.js
+@@ -239,11 +239,6 @@ function push(status) {
+             'deposit': deposit,
+             'postEditor': postEditor
+         },
+-        success: function (data) {
+-            if (data.code == 1) {
+-                showMsgAndRedirect("发布成功", "success", 1000, "/admin/post/lease");
+-            } else {
+-                showMsg(data.msg, "error", 2000);
+             }
+         }
+     });

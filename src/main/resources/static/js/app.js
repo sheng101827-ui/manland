@@ -239,11 +239,6 @@ function push(status) {
             'deposit': deposit,
             'postEditor': postEditor
         },
-        success: function (data) {
-            if (data.code == 1) {
-                showMsgAndRedirect("发布成功", "success", 1000, "/admin/post/lease");
-            } else {
-                showMsg(data.msg, "error", 2000);
             }
         }
     });
