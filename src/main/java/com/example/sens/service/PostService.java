@@ -54,4 +54,15 @@ public interface PostService extends BaseService<Post, Long> {
      * @return
      */
     List<Post> getUnionRentPost(Post post);
+
+    /**
+     * 按面积检索房屋列表
+     *
+     * @param minArea 最小面积
+     * @param maxArea 最大面积
+     * @param page 页码
+     * @param size 每页大小
+     * @return 房屋列表
+     */
+    List<Post> getByArea(int minArea, int maxArea, int page, int size);
 }
