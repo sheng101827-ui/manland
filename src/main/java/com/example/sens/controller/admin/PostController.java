@@ -295,5 +295,24 @@ public class PostController extends BaseController {
         return "admin/admin_post_edit";
     }
 
+    /**
+     * 按面积范围查询房屋列表
+     *
+     * @param minArea 最小面积
+     * @param maxArea 最大面积
+     * @param page 页码（从1开始）
+     * @param size 每页大小
+     * @return 房屋列表
+     */
+    @GetMapping(value = "/listByArea")
+    @ResponseBody
+    public JsonResult listByArea(@RequestParam("minArea") int minArea,
+                                  @RequestParam("maxArea") int maxArea,
+                                  @RequestParam(value = "page", defaultValue = "1") int page,
+                                  @RequestParam(value = "size", defaultValue = "10") int size) {
+        List<Post> postList = postService.getByArea(minArea, maxArea, page, size);
+        return JsonResult.success(postList);
+    }
+
 
 }
