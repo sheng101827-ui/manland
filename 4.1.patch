@@ -1,0 +1,92 @@
+diff --git a/src/main/java/com/example/sens/controller/admin/PostController.java b/src/main/java/com/example/sens/controller/admin/PostController.java
+index 2b09e3b..65d0b8c 100755
+--- a/src/main/java/com/example/sens/controller/admin/PostController.java
++++ b/src/main/java/com/example/sens/controller/admin/PostController.java
+@@ -19,6 +19,7 @@ import org.springframework.stereotype.Controller;
+ import org.springframework.ui.Model;
+ import org.springframework.web.bind.annotation.*;
+ 
++import java.util.Date;
+ import java.util.List;
+ import java.util.Objects;
+ 
+@@ -175,7 +176,7 @@ public class PostController extends BaseController {
+      */
+     @PostMapping(value = "/save")
+     @ResponseBody
+-    public JsonResult pushPost(@ModelAttribute Post post) {
++    public JsonResult pushPost(@RequestBody Post post) {
+         if (post.getId() != null) {
+             // 只允许更新部分字段
+             Post temp = new Post();
+@@ -204,9 +205,10 @@ public class PostController extends BaseController {
+             post.setImgUrl(imgUrl);
+         }
+ 
+-        // 2.添加/更新入库
++        // 3.添加/更新入库
+         if (post.getId() == null) {
+             post.setUserId(getLoginUserId());
++            post.setCreateTime(new Date());
+         }
+         postService.insertOrUpdate(post);
+         return JsonResult.success("发布成功");
+@@ -294,6 +296,4 @@ public class PostController extends BaseController {
+         model.addAttribute("cities", cities);
+         return "admin/admin_post_edit";
+     }
+-
+-
+ }
+diff --git a/src/main/resources/static/js/app.js b/src/main/resources/static/js/app.js
+index 5df342f..2a287e9 100755
+--- a/src/main/resources/static/js/app.js
++++ b/src/main/resources/static/js/app.js
+@@ -219,26 +219,31 @@ function push(status) {
+         return;
+     }
+ 
++    const post = {
++        'postStatus': status,
++        'postTitle': postTitle,
++        'postContent': postContent,
++        'cateId': cateId,
++        'postThumbnail': postThumbnail,
++        'price': price,
++        'number': number,
++        'cityId': cityId,
++        'roomCount': roomCount,
++        'toiletCount': toiletCount,
++        'area': area,
++        'deposit': deposit,
++        'postEditor': postEditor
++    };
++    if (id) {
++        post.id = id;
++    }
++
+     $.ajax({
+         type: 'POST',
+         url: '/admin/post/save',
+         async: false,
+-        data: {
+-            'id': id,
+-            'postStatus': status,
+-            'postTitle': postTitle,
+-            'postContent': postContent,
+-            'cateId': cateId,
+-            'postThumbnail': postThumbnail,
+-            'price': price,
+-            'number': number,
+-            'cityId': cityId,
+-            'roomCount': roomCount,
+-            'toiletCount': toiletCount,
+-            'area': area,
+-            'deposit': deposit,
+-            'postEditor': postEditor
+-        },
++        contentType: 'application/json;charset=UTF-8',
++        data: JSON.stringify(post),
+         success: function (data) {
+             if (data.code == 1) {
+                 showMsgAndRedirect("发布成功", "success", 1000, "/admin/post/lease");

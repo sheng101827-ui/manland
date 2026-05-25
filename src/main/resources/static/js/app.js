@@ -219,26 +219,31 @@ function push(status) {
         return;
     }
 
+    const post = {
+        'postStatus': status,
+        'postTitle': postTitle,
+        'postContent': postContent,
+        'cateId': cateId,
+        'postThumbnail': postThumbnail,
+        'price': price,
+        'number': number,
+        'cityId': cityId,
+        'roomCount': roomCount,
+        'toiletCount': toiletCount,
+        'area': area,
+        'deposit': deposit,
+        'postEditor': postEditor
+    };
+    if (id) {
+        post.id = id;
+    }
+
     $.ajax({
         type: 'POST',
         url: '/admin/post/save',
         async: false,
-        data: {
-            'id': id,
-            'postStatus': status,
-            'postTitle': postTitle,
-            'postContent': postContent,
-            'cateId': cateId,
-            'postThumbnail': postThumbnail,
-            'price': price,
-            'number': number,
-            'cityId': cityId,
-            'roomCount': roomCount,
-            'toiletCount': toiletCount,
-            'area': area,
-            'deposit': deposit,
-            'postEditor': postEditor
-        },
+        contentType: 'application/json;charset=UTF-8',
+        data: JSON.stringify(post),
         success: function (data) {
             if (data.code == 1) {
                 showMsgAndRedirect("发布成功", "success", 1000, "/admin/post/lease");
