@@ -7,6 +7,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.example.sens.exception.MyBusinessException;
 import com.example.sens.common.constant.CommonConstant;
 import com.example.sens.entity.Role;
+import com.example.sens.entity.RechargeRecord;
 import com.example.sens.mapper.OrderMapper;
 import com.example.sens.mapper.RechargeRecordMapper;
 import com.example.sens.mapper.UserMapper;
@@ -22,6 +23,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.*;
+
+import java.math.BigDecimal;
 
 /**
  * 用户业务逻辑实现类
@@ -196,5 +199,23 @@ public class UserServiceImpl implements UserService {
     public User get(Long id) {
         User user = userMapper.selectById(id);
         return user;
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public RechargeRecord recharge(Long userId, BigDecimal amount) {
+        User user = get(userId);
+        if (user == null) {
+            throw new MyBusinessException("用户不存在");
+        }
+        user.setMoney(user.getMoney() + amount.longValue());
+        userMapper.updateById(user);
+
+        RechargeRecord rechargeRecord = new RechargeRecord();
+        rechargeRecord.setUserId(userId);
+        rechargeRecord.setMoney(amount.longValue());
+        rechargeRecord.setCreateTime(new Date());
+        rechargeRecordMapper.insert(rechargeRecord);
+        return rechargeRecord;
     }
 }
