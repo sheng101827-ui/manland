@@ -1,0 +1,108 @@
+diff --git a/src/main/java/com/example/sens/controller/home/FrontPostController.java b/src/main/java/com/example/sens/controller/home/FrontPostController.java
+index f7e62af..7bc14b4 100644
+--- a/src/main/java/com/example/sens/controller/home/FrontPostController.java
++++ b/src/main/java/com/example/sens/controller/home/FrontPostController.java
+@@ -499,17 +499,15 @@ public class FrontPostController extends BaseController {
+             return JsonResult.error("没有权限");
+         }
+ 
+-        Post post = postService.get(order.getPostId());
+-        if (post == null || !Objects.equals(post.getPostStatus(), PostStatusEnum.ON_SALE.getCode())) {
++        // 调用bookHouse方法预定房屋
++        boolean booked = postService.bookHouse(order.getPostId(), order.getUserId());
++        if (!booked) {
+             return JsonResult.error("房屋已租出，暂时无法预定");
+         }
+ 
+         order.setStatus(OrderStatusEnum.HAS_PAY.getCode());
+         orderService.update(order);
+ 
+-        post.setPostStatus(PostStatusEnum.OFF_SALE.getCode());
+-        postService.update(post);
+-
+         // 这里暂不用乐观锁实现，忽略并发问题
+         // 我的余额减少
+         user.setMoney(user.getMoney() - order.getPrice());
+diff --git a/src/main/java/com/example/sens/service/PostService.java b/src/main/java/com/example/sens/service/PostService.java
+index 562e429..5f6d378 100755
+--- a/src/main/java/com/example/sens/service/PostService.java
++++ b/src/main/java/com/example/sens/service/PostService.java
+@@ -54,4 +54,13 @@ public interface PostService extends BaseService<Post, Long> {
+      * @return
+      */
+     List<Post> getUnionRentPost(Post post);
++
++    /**
++     * 预定房屋
++     *
++     * @param houseId 房屋ID
++     * @param userId 租客用户ID
++     * @return 是否成功预定
++     */
++    boolean bookHouse(Long houseId, Long userId);
+ }
+diff --git a/src/main/java/com/example/sens/service/impl/PostServiceImpl.java b/src/main/java/com/example/sens/service/impl/PostServiceImpl.java
+index 0361e6f..2120ee2 100755
+--- a/src/main/java/com/example/sens/service/impl/PostServiceImpl.java
++++ b/src/main/java/com/example/sens/service/impl/PostServiceImpl.java
+@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+ import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+ import com.example.sens.entity.*;
++import com.example.sens.enums.PostStatusEnum;
+ import com.example.sens.mapper.*;
+ import com.example.sens.service.*;
+ import lombok.extern.slf4j.Slf4j;
+@@ -13,6 +14,8 @@ import org.springframework.stereotype.Service;
+ import org.springframework.transaction.annotation.Transactional;
+ 
+ import java.util.List;
++import java.util.Map;
++import java.util.concurrent.ConcurrentHashMap;
+ 
+ 
+ /**
+@@ -28,6 +31,43 @@ public class PostServiceImpl implements PostService {
+     @Autowired
+     private PostMapper postMapper;
+ 
++    /**
++     * 用于每个房屋ID的锁对象
++     */
++    private final Map<Long, Object> houseLocks = new ConcurrentHashMap<>();
++
++    @Override
++    public boolean bookHouse(Long houseId, Long userId) {
++        // 获取该房屋的锁对象
++        Object lock = houseLocks.computeIfAbsent(houseId, k -> new Object());
++
++        synchronized (lock) {
++            try {
++                // 再次查询房屋状态
++                Post post = postMapper.selectById(houseId);
++                if (post == null) {
++                    log.error("房屋不存在: {}", houseId);
++                    return false;
++                }
++
++                // 检查房屋是否还在可出租状态
++                if (!PostStatusEnum.ON_SALE.getCode().equals(post.getPostStatus())) {
++                    log.warn("房屋已被租出: {}", houseId);
++                    return false;
++                }
++
++                // 更新房屋状态为已租出
++                post.setPostStatus(PostStatusEnum.OFF_SALE.getCode());
++                int updated = postMapper.updateById(post);
++
++                return updated > 0;
++            } finally {
++                // 清理锁对象，避免内存泄漏
++                houseLocks.remove(houseId);
++            }
++        }
++    }
++
+     @Override
+     public Page<Post> findPostByCondition(Post condition, Page<Post> page) {
+         List<Post> postList = postMapper.findPostByCondition(condition, page);

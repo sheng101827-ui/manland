@@ -499,16 +499,14 @@ public class FrontPostController extends BaseController {
             return JsonResult.error("没有权限");
         }
 
-        Post post = postService.get(order.getPostId());
-        if (post == null || !Objects.equals(post.getPostStatus(), PostStatusEnum.ON_SALE.getCode())) {
+        // 调用bookHouse方法预定房屋
+        boolean booked = postService.bookHouse(order.getPostId(), order.getUserId());
+        if (!booked) {
             return JsonResult.error("房屋已租出，暂时无法预定");
         }
 
         order.setStatus(OrderStatusEnum.HAS_PAY.getCode());
         orderService.update(order);
-
-        post.setPostStatus(PostStatusEnum.OFF_SALE.getCode());
-        postService.update(post);
 
         // 这里暂不用乐观锁实现，忽略并发问题
         // 我的余额减少

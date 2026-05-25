@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.example.sens.entity.*;
+import com.example.sens.enums.PostStatusEnum;
 import com.example.sens.mapper.*;
 import com.example.sens.service.*;
 import lombok.extern.slf4j.Slf4j;
@@ -13,6 +14,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 
 /**
@@ -27,6 +30,43 @@ public class PostServiceImpl implements PostService {
 
     @Autowired
     private PostMapper postMapper;
+
+    /**
+     * 用于每个房屋ID的锁对象
+     */
+    private final Map<Long, Object> houseLocks = new ConcurrentHashMap<>();
+
+    @Override
+    public boolean bookHouse(Long houseId, Long userId) {
+        // 获取该房屋的锁对象
+        Object lock = houseLocks.computeIfAbsent(houseId, k -> new Object());
+
+        synchronized (lock) {
+            try {
+                // 再次查询房屋状态
+                Post post = postMapper.selectById(houseId);
+                if (post == null) {
+                    log.error("房屋不存在: {}", houseId);
+                    return false;
+                }
+
+                // 检查房屋是否还在可出租状态
+                if (!PostStatusEnum.ON_SALE.getCode().equals(post.getPostStatus())) {
+                    log.warn("房屋已被租出: {}", houseId);
+                    return false;
+                }
+
+                // 更新房屋状态为已租出
+                post.setPostStatus(PostStatusEnum.OFF_SALE.getCode());
+                int updated = postMapper.updateById(post);
+
+                return updated > 0;
+            } finally {
+                // 清理锁对象，避免内存泄漏
+                houseLocks.remove(houseId);
+            }
+        }
+    }
 
     @Override
     public Page<Post> findPostByCondition(Post condition, Page<Post> page) {
