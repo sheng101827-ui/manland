@@ -14,7 +14,9 @@ import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.Date;
+import java.math.BigDecimal;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * @author 言曌
@@ -44,7 +46,7 @@ public class RechargeRecordController extends BaseController {
                                   @RequestParam(value = "sort", defaultValue = "createTime") String sort,
                                   @RequestParam(value = "order", defaultValue = "desc") String order, Model model) {
         Page page = PageUtil.initMpPage(pageNumber, pageSize, sort, order);
-        Page<RechargeRecord> rechargeRecords = null;
+        Page<RechargeRecord> rechargeRecords;
 
         if (loginUserIsAdmin()) {
             rechargeRecords = rechargeRecordService.findAll(startDate, endDate, page);
@@ -59,6 +61,25 @@ public class RechargeRecordController extends BaseController {
         return "admin/admin_rechargeRecord";
     }
 
+    /**
+     * 充值财务统计接口
+     *
+     * @param startDate 开始日期
+     * @param endDate 结束日期
+     * @return 统计结果
+     */
+    @GetMapping(value = "/finance")
+    @ResponseBody
+    public JsonResult finance(@RequestParam(value = "startDate", defaultValue = "") String startDate,
+                              @RequestParam(value = "endDate", defaultValue = "") String endDate) {
+        Long userId = loginUserIsAdmin() ? null : getLoginUserId();
+        Map<String, Object> result = new HashMap<>(4);
+        result.put("totalMoney", rechargeRecordService.getTotalMoneySum(startDate, endDate, userId));
+        result.put("totalCount", rechargeRecordService.countByCondition(startDate, endDate, userId));
+        result.put("startDate", startDate);
+        result.put("endDate", endDate);
+        return JsonResult.success("获取充值统计成功", result);
+    }
 
     /**
      * 删除充值记录
@@ -72,7 +93,6 @@ public class RechargeRecordController extends BaseController {
         rechargeRecordService.delete(rechargeRecordId);
         return JsonResult.success("删除充值记录成功");
     }
-
 
     /**
      * 充值界面
@@ -89,8 +109,8 @@ public class RechargeRecordController extends BaseController {
     /**
      * 充值保存
      *
-     * @param money
-     * @return
+     * @param money 充值金额
+     * @return JsonResult
      */
     @PostMapping(value = "/save")
     @ResponseBody
@@ -98,20 +118,7 @@ public class RechargeRecordController extends BaseController {
         if (money > 10000 || money < 10) {
             return JsonResult.error("充值金额不合法(最少10元，最多1万元)");
         }
-        // 充值操作
-        // 忽略，假设直接充值成功
-        // 修改余额
-        User loginUser = getLoginUser();
-        User user = userService.get(loginUser.getId());
-        user.setMoney(user.getMoney() + money);
-        userService.insertOrUpdate(user);
-
-        // 添加充值记录
-        RechargeRecord rechargeRecord = new RechargeRecord();
-        rechargeRecord.setUserId(loginUser.getId());
-        rechargeRecord.setMoney(money);
-        rechargeRecord.setCreateTime(new Date());
-        rechargeRecordService.insert(rechargeRecord);
-        return JsonResult.success("充值成功", user.getMoney());
+        Long currentMoney = userService.recharge(getLoginUserId(), BigDecimal.valueOf(money));
+        return JsonResult.success("充值成功", currentMoney);
     }
 }

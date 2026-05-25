@@ -4,6 +4,8 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.example.sens.common.base.BaseService;
 import com.example.sens.entity.User;
 
+import java.math.BigDecimal;
+
 /**
  * 用户业务逻辑接口
  */
@@ -43,5 +45,14 @@ public interface UserService extends BaseService<User, Long> {
      * @return 用户列表
      */
     Page<User> findByRoleAndCondition(String roleName, User condition, Page<User> page);
+
+    /**
+     * 用户充值并记录充值流水
+     *
+     * @param userId 用户ID
+     * @param amount 充值金额
+     * @return 充值后的余额
+     */
+    Long recharge(Long userId, BigDecimal amount);
 
 }
