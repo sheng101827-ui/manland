@@ -119,5 +119,24 @@ public class PostServiceImpl implements PostService {
         return postMapper.getUnionRentPost(temp);
     }
 
+    @Override
+    public List<Post> getByArea(int minArea, int maxArea, int page, int size) {
+        QueryWrapper<Post> queryWrapper = new QueryWrapper<>();
+        queryWrapper.ge("area", minArea)
+                .le("area", maxArea)
+                .eq("del_flag", 0);
+        
+        List<Post> allPosts = postMapper.selectList(queryWrapper);
+        
+        int fromIndex = (page - 1) * size;
+        int toIndex = Math.min(fromIndex + size, allPosts.size());
+        
+        if (fromIndex >= allPosts.size()) {
+            return Collections.emptyList();
+        }
+        
+        return allPosts.subList(fromIndex, toIndex);
+    }
+
 }
 
