@@ -102,7 +102,6 @@ public class FrontPostController extends BaseController {
             e.printStackTrace();
         }
 
-        // 查询日期列表
         Page page = PageUtil.initMpPage(pageNumber, pageSize, sort, order);
         condition.setPostTitle(postTitle);
         condition.setPostStatus(status);
@@ -118,7 +117,6 @@ public class FrontPostController extends BaseController {
         model.addAttribute("area", area);
         model.addAttribute("price", price);
 
-        // 侧边栏
         model.addAttribute("onCount", postService.countByStatus(PostStatusEnum.ON_SALE.getCode()));
         model.addAttribute("offCount", postService.countByStatus(PostStatusEnum.OFF_SALE.getCode()));
 
@@ -148,12 +146,10 @@ public class FrontPostController extends BaseController {
                               HttpSession session,
                               Model model) {
 
-        // 房屋
         Post post = postService.get(id);
         if (post == null) {
             return renderNotFound();
         }
-        // 分类和城市
         Category category = categoryService.get(post.getCateId());
         City city = cityService.get(post.getCityId());
         User user = userService.get(post.getUserId());
@@ -179,7 +175,6 @@ public class FrontPostController extends BaseController {
         List<Post> latestPostList = postService.getLatestPost(cityId, 6);
         model.addAttribute("latestPostList", latestPostList);
 
-        // 可以考虑优化下，暂时没有时间优化
         List<Post> unionRentPost = postService.getUnionRentPost(post);
         List<Order> orderList = new ArrayList<>();
         for (Post temp : unionRentPost) {
@@ -219,7 +214,6 @@ public class FrontPostController extends BaseController {
 
         Date today = new Date();
 
-        // 判断入住日期是否合法
         if (StringUtils.isEmpty(start)) {
             start = dateFormat.format(today);
         } else {
@@ -244,7 +238,6 @@ public class FrontPostController extends BaseController {
             return "redirect:/";
         }
 
-        // 分类列表
         List<Category> categoryList = categoryService.findAll();
         model.addAttribute("categoryList", categoryList);
         List<City> cityList = cityService.findAll();
@@ -296,7 +289,6 @@ public class FrontPostController extends BaseController {
         cal.setTime(today);
         cal.add(Calendar.MONTH, quantity);
 
-        // 添加订单
         Order order = new Order();
         order.setPostId(postId);
         order.setQuantity(quantity);
@@ -331,7 +323,6 @@ public class FrontPostController extends BaseController {
         model.addAttribute("order", order);
 
 
-        // 分类列表
         List<Category> categoryList = categoryService.findAll();
         model.addAttribute("categoryList", categoryList);
         List<City> cityList = cityService.findAll();
@@ -359,14 +350,6 @@ public class FrontPostController extends BaseController {
 
         order.setUser(userService.get(order.getUserId()));
         order.setOwnerUser(userService.get(order.getOwnerUserId()));
-//        User user = getLoginUser();
-//        if (user == null) {
-//            return "redirect:/login";
-//        }
-//
-//        if (!Objects.equals(user.getId(), order.getUserId()) && !Objects.equals(user.getId(), order.getOwnerUserId()) && !loginUserIsAdmin()) {
-//            return this.renderNotAllowAccess();
-//        }
 
         model.addAttribute("order", order);
         List<City> cityList = cityService.findAll();
@@ -399,16 +382,13 @@ public class FrontPostController extends BaseController {
             User user = userService.get(order.getUserId());
             User ownerUser = userService.get(order.getOwnerUserId());
             String pdfName = ownerUser.getUserDisplayName() + "&" + user.getUserDisplayName() + "租房合同.html";
-            // 获取外部文件流
             URL url = new URL(tempContextUrl + "agreement?orderId=" + orderId);
 
             HttpURLConnection conn = (HttpURLConnection) url.openConnection();
             conn.setConnectTimeout(3 * 1000);
-            //防止屏蔽程序抓取而返回403错误
             conn.setRequestProperty("User-Agent", "Mozilla/4.0 (compatible; MSIE 5.0; Windows NT; DigExt)");
             inputStream = conn.getInputStream();
             int len = 0;
-            // 输出 下载的响应头，如果下载的文件是中文名，文件名需要经过url编码
             response.setContentType("text/html;charset=utf-8");
             response.setHeader("Content-Disposition", "attachment;filename=" + URLEncoder.encode(pdfName, "UTF-8"));
             response.setHeader("Cache-Control", "no-cache");
@@ -499,23 +479,20 @@ public class FrontPostController extends BaseController {
             return JsonResult.error("没有权限");
         }
 
-        Post post = postService.get(order.getPostId());
-        if (post == null || !Objects.equals(post.getPostStatus(), PostStatusEnum.ON_SALE.getCode())) {
+        if (!Objects.equals(OrderStatusEnum.NOT_PAY.getCode(), order.getStatus())) {
+            return JsonResult.error("订单状态不正确");
+        }
+
+        if (!postService.bookHouse(order.getPostId(), user.getId())) {
             return JsonResult.error("房屋已租出，暂时无法预定");
         }
 
         order.setStatus(OrderStatusEnum.HAS_PAY.getCode());
         orderService.update(order);
 
-        post.setPostStatus(PostStatusEnum.OFF_SALE.getCode());
-        postService.update(post);
-
-        // 这里暂不用乐观锁实现，忽略并发问题
-        // 我的余额减少
         user.setMoney(user.getMoney() - order.getPrice());
         userService.update(user);
 
-        // 对方的余额增加
         User ownerUser = userService.get(order.getOwnerUserId());
         ownerUser.setMoney(ownerUser.getMoney() + order.getPrice());
         userService.update(ownerUser);
@@ -535,6 +512,4 @@ public class FrontPostController extends BaseController {
     public String register() {
         return "home/register";
     }
-
-
 }

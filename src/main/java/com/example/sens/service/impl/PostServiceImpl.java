@@ -4,16 +4,22 @@ import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.example.sens.entity.*;
-import com.example.sens.mapper.*;
-import com.example.sens.service.*;
+import com.example.sens.entity.Post;
+import com.example.sens.enums.PostStatusEnum;
+import com.example.sens.mapper.PostMapper;
+import com.example.sens.service.PostService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.util.List;
-
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * <pre>
@@ -24,9 +30,12 @@ import java.util.List;
 @Slf4j
 public class PostServiceImpl implements PostService {
 
-
     @Autowired
     private PostMapper postMapper;
+
+    private final Map<Long, Object> bookingLocks = new ConcurrentHashMap<>();
+
+    private final Set<Long> bookingPostIds = ConcurrentHashMap.newKeySet();
 
     @Override
     public Page<Post> findPostByCondition(Post condition, Page<Post> page) {
@@ -66,7 +75,6 @@ public class PostServiceImpl implements PostService {
 
     @Override
     public QueryWrapper<Post> getQueryWrapper(Post post) {
-        //对指定字段查询
         QueryWrapper<Post> queryWrapper = new QueryWrapper<>();
         if (post != null) {
             if (StrUtil.isNotBlank(post.getPostTitle())) {
@@ -105,7 +113,6 @@ public class PostServiceImpl implements PostService {
 
     @Override
     public List<Post> getUnionRentPost(Post post) {
-
         Post temp = new Post();
         temp.setNumber(post.getNumber());
         temp.setUserId(post.getUserId());
@@ -119,5 +126,47 @@ public class PostServiceImpl implements PostService {
         return postMapper.getUnionRentPost(temp);
     }
 
+    @Override
+    public boolean bookHouse(Long houseId, Long userId) {
+        Object lock = bookingLocks.computeIfAbsent(houseId, key -> new Object());
+        synchronized (lock) {
+            boolean locked = bookingPostIds.add(houseId);
+            if (!locked) {
+                return false;
+            }
+            boolean releaseAfterTransaction = false;
+            try {
+                Post currentPost = postMapper.selectById(houseId);
+                if (currentPost == null) {
+                    return false;
+                }
+                if (!Objects.equals(currentPost.getPostStatus(), PostStatusEnum.ON_SALE.getCode())) {
+                    return false;
+                }
+                if (Objects.equals(currentPost.getUserId(), userId)) {
+                    return false;
+                }
+                Post updatePost = new Post();
+                updatePost.setId(houseId);
+                updatePost.setPostStatus(PostStatusEnum.OFF_SALE.getCode());
+                if (postMapper.updateById(updatePost) <= 0) {
+                    return false;
+                }
+                if (TransactionSynchronizationManager.isSynchronizationActive()) {
+                    releaseAfterTransaction = true;
+                    TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                        @Override
+                        public void afterCompletion(int status) {
+                            bookingPostIds.remove(houseId);
+                        }
+                    });
+                }
+                return true;
+            } finally {
+                if (!releaseAfterTransaction) {
+                    bookingPostIds.remove(houseId);
+                }
+            }
+        }
+    }
 }
-
