@@ -1,0 +1,123 @@
+diff --git a/src/main/java/com/example/sens/controller/admin/RechargeRecordController.java b/src/main/java/com/example/sens/controller/admin/RechargeRecordController.java
+index 72c5e16..0b7058b 100644
+--- a/src/main/java/com/example/sens/controller/admin/RechargeRecordController.java
++++ b/src/main/java/com/example/sens/controller/admin/RechargeRecordController.java
+@@ -98,20 +98,13 @@ public class RechargeRecordController extends BaseController {
+         if (money > 10000 || money < 10) {
+             return JsonResult.error("充值金额不合法(最少10元，最多1万元)");
+         }
+-        // 充值操作
+-        // 忽略，假设直接充值成功
+-        // 修改余额
++        // 使用 UserService 的 recharge 方法完成充值
+         User loginUser = getLoginUser();
++        // 直接使用 BigDecimal 包装 Long 类型的 money（以分为单位）
++        userService.recharge(loginUser.getId(), new BigDecimal(money));
++        
++        // 获取更新后的用户信息返回
+         User user = userService.get(loginUser.getId());
+-        user.setMoney(user.getMoney() + money);
+-        userService.insertOrUpdate(user);
+-
+-        // 添加充值记录
+-        RechargeRecord rechargeRecord = new RechargeRecord();
+-        rechargeRecord.setUserId(loginUser.getId());
+-        rechargeRecord.setMoney(money);
+-        rechargeRecord.setCreateTime(new Date());
+-        rechargeRecordService.insert(rechargeRecord);
+         return JsonResult.success("充值成功", user.getMoney());
+     }
+ }
+diff --git a/src/main/java/com/example/sens/service/UserService.java b/src/main/java/com/example/sens/service/UserService.java
+index ec5df4e..504c341 100755
+--- a/src/main/java/com/example/sens/service/UserService.java
++++ b/src/main/java/com/example/sens/service/UserService.java
+@@ -4,6 +4,8 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+ import com.example.sens.common.base.BaseService;
+ import com.example.sens.entity.User;
+ 
++import java.math.BigDecimal;
++
+ /**
+  * 用户业务逻辑接口
+  */
+@@ -44,4 +46,12 @@ public interface UserService extends BaseService<User, Long> {
+      */
+     Page<User> findByRoleAndCondition(String roleName, User condition, Page<User> page);
+ 
++    /**
++     * 充值
++     *
++     * @param userId 用户Id
++     * @param amount 充值金额
++     */
++    void recharge(Long userId, BigDecimal amount);
++
+ }
+diff --git a/src/main/java/com/example/sens/service/impl/UserServiceImpl.java b/src/main/java/com/example/sens/service/impl/UserServiceImpl.java
+index f27be88..0904201 100644
+--- a/src/main/java/com/example/sens/service/impl/UserServiceImpl.java
++++ b/src/main/java/com/example/sens/service/impl/UserServiceImpl.java
+@@ -4,6 +4,7 @@ import cn.hutool.core.util.StrUtil;
+ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+ import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
++import com.example.sens.entity.RechargeRecord;
+ import com.example.sens.exception.MyBusinessException;
+ import com.example.sens.common.constant.CommonConstant;
+ import com.example.sens.entity.Role;
+@@ -11,6 +12,7 @@ import com.example.sens.mapper.OrderMapper;
+ import com.example.sens.mapper.RechargeRecordMapper;
+ import com.example.sens.mapper.UserMapper;
+ import com.example.sens.entity.User;
++import com.example.sens.service.RechargeRecordService;
+ import com.example.sens.service.RoleService;
+ import com.example.sens.service.UserService;
+ import com.example.sens.util.Md5Util;
+@@ -21,6 +23,7 @@ import org.springframework.beans.factory.annotation.Autowired;
+ import org.springframework.stereotype.Service;
+ import org.springframework.transaction.annotation.Transactional;
+ 
++import java.math.BigDecimal;
+ import java.util.*;
+ 
+ /**
+@@ -41,6 +44,9 @@ public class UserServiceImpl implements UserService {
+     @Autowired
+     private RechargeRecordMapper rechargeRecordMapper;
+ 
++    @Autowired
++    private RechargeRecordService rechargeRecordService;
++
+     @Override
+     public User findByUserName(String userName) {
+         QueryWrapper queryWrapper = new QueryWrapper();
+@@ -197,4 +203,28 @@ public class UserServiceImpl implements UserService {
+         User user = userMapper.selectById(id);
+         return user;
+     }
++
++    @Override
++    @Transactional(rollbackFor = Exception.class)
++    public void recharge(Long userId, BigDecimal amount) {
++        // 1. 使用 MP 查询用户
++        User user = getById(userId);
++        if (user == null) {
++            throw new MyBusinessException("用户不存在");
++        }
++
++        // 2. 在 Java 中计算余额（注意：User 实体中 money 是 Long 类型，这里直接使用 amount 作为分）
++        Long currentMoney = user.getMoney() == null ? 0L : user.getMoney();
++        Long rechargeMoney = amount.longValue();
++        user.setMoney(currentMoney + rechargeMoney);
++
++        // 3. 使用 MP 更新用户
++        updateById(user);
++
++        // 4. 记录充值流水
++        RechargeRecord record = new RechargeRecord();
++        record.setUserId(userId);
++        record.setMoney(rechargeMoney);
++        rechargeRecordService.insert(record);
++    }
+ }
