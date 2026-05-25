@@ -1,0 +1,116 @@
+diff --git a/src/main/java/com/example/sens/entity/House.java b/src/main/java/com/example/sens/entity/House.java
+new file mode 100644
+index 0000000..0000000
+--- /dev/null
++++ b/src/main/java/com/example/sens/entity/House.java
+@@ -0,0 +1,17 @@
++package com.example.sens.entity;
++
++import com.baomidou.mybatisplus.annotation.TableName;
++import com.example.sens.common.base.BaseEntity;
++import lombok.Data;
++
++@Data
++@TableName("t_house")
++public class House extends BaseEntity {
++
++    private Long ownerUserId;
++
++    private Long tenantUserId;
++
++    private Integer status;
++
++}
+diff --git a/src/main/java/com/example/sens/mapper/HouseMapper.java b/src/main/java/com/example/sens/mapper/HouseMapper.java
+new file mode 100644
+index 0000000..0000000
+--- /dev/null
++++ b/src/main/java/com/example/sens/mapper/HouseMapper.java
+@@ -0,0 +1,10 @@
++package com.example.sens.mapper;
++
++import com.baomidou.mybatisplus.core.mapper.BaseMapper;
++import com.example.sens.entity.House;
++import org.apache.ibatis.annotations.Mapper;
++
++@Mapper
++public interface HouseMapper extends BaseMapper<House> {
++
++}
+diff --git a/src/main/java/com/example/sens/service/HouseService.java b/src/main/java/com/example/sens/service/HouseService.java
+new file mode 100644
+index 0000000..0000000
+--- /dev/null
++++ b/src/main/java/com/example/sens/service/HouseService.java
+@@ -0,0 +1,10 @@
++package com.example.sens.service;
++
++import com.example.sens.common.base.BaseService;
++import com.example.sens.entity.House;
++
++public interface HouseService extends BaseService<House, Long> {
++
++    boolean bookHouse(Long houseId, Long userId);
++
++}
+diff --git a/src/main/java/com/example/sens/service/impl/HouseServiceImpl.java b/src/main/java/com/example/sens/service/impl/HouseServiceImpl.java
+new file mode 100644
+index 0000000..0000000
+--- /dev/null
++++ b/src/main/java/com/example/sens/service/impl/HouseServiceImpl.java
+@@ -0,0 +1,55 @@
++package com.example.sens.service.impl;
++
++import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
++import com.baomidou.mybatisplus.core.mapper.BaseMapper;
++import com.example.sens.entity.House;
++import com.example.sens.mapper.HouseMapper;
++import com.example.sens.service.HouseService;
++import org.springframework.beans.factory.annotation.Autowired;
++import org.springframework.stereotype.Service;
++
++import java.util.Objects;
++import java.util.concurrent.ConcurrentHashMap;
++
++@Service
++public class HouseServiceImpl implements HouseService {
++
++    private static final Integer STATUS_AVAILABLE = 0;
++    private static final Integer STATUS_BOOKED = 1;
++
++    private final ConcurrentHashMap<Long, Object> lockMap = new ConcurrentHashMap<>();
++
++    @Autowired
++    private HouseMapper houseMapper;
++
++    @Override
++    public boolean bookHouse(Long houseId, Long userId) {
++        Object lock = lockMap.computeIfAbsent(houseId, k -> new Object());
++        synchronized (lock) {
++            House house = houseMapper.selectById(houseId);
++            if (house == null) {
++                return false;
++            }
++            if (!Objects.equals(STATUS_AVAILABLE, house.getStatus())) {
++                return false;
++            }
++
++            House update = new House();
++            update.setId(houseId);
++            update.setStatus(STATUS_BOOKED);
++            update.setTenantUserId(userId);
++            houseMapper.updateById(update);
++            return true;
++        }
++    }
++
++    @Override
++    public BaseMapper<House> getRepository() {
++        return houseMapper;
++    }
++
++    @Override
++    public QueryWrapper<House> getQueryWrapper(House house) {
++        return new QueryWrapper<>();
++    }
++}
