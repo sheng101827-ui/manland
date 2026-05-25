@@ -1,0 +1,459 @@
+diff --git a/src/main/java/com/example/sens/controller/admin/RechargeRecordController.java b/src/main/java/com/example/sens/controller/admin/RechargeRecordController.java
+index 72c5e16..b0db471 100644
+--- a/src/main/java/com/example/sens/controller/admin/RechargeRecordController.java
++++ b/src/main/java/com/example/sens/controller/admin/RechargeRecordController.java
+@@ -14,7 +14,9 @@ import org.springframework.stereotype.Controller;
+ import org.springframework.ui.Model;
+ import org.springframework.web.bind.annotation.*;
+ 
+-import java.util.Date;
++import java.math.BigDecimal;
++import java.util.HashMap;
++import java.util.Map;
+ 
+ /**
+  * @author 言曌
+@@ -44,7 +46,7 @@ public class RechargeRecordController extends BaseController {
+                                   @RequestParam(value = "sort", defaultValue = "createTime") String sort,
+                                   @RequestParam(value = "order", defaultValue = "desc") String order, Model model) {
+         Page page = PageUtil.initMpPage(pageNumber, pageSize, sort, order);
+-        Page<RechargeRecord> rechargeRecords = null;
++        Page<RechargeRecord> rechargeRecords;
+ 
+         if (loginUserIsAdmin()) {
+             rechargeRecords = rechargeRecordService.findAll(startDate, endDate, page);
+@@ -59,6 +61,25 @@ public class RechargeRecordController extends BaseController {
+         return "admin/admin_rechargeRecord";
+     }
+ 
++    /**
++     * 充值财务统计接口
++     *
++     * @param startDate 开始日期
++     * @param endDate 结束日期
++     * @return 统计结果
++     */
++    @GetMapping(value = "/finance")
++    @ResponseBody
++    public JsonResult finance(@RequestParam(value = "startDate", defaultValue = "") String startDate,
++                              @RequestParam(value = "endDate", defaultValue = "") String endDate) {
++        Long userId = loginUserIsAdmin() ? null : getLoginUserId();
++        Map<String, Object> result = new HashMap<>(4);
++        result.put("totalMoney", rechargeRecordService.getTotalMoneySum(startDate, endDate, userId));
++        result.put("totalCount", rechargeRecordService.countByCondition(startDate, endDate, userId));
++        result.put("startDate", startDate);
++        result.put("endDate", endDate);
++        return JsonResult.success("获取充值统计成功", result);
++    }
+ 
+     /**
+      * 删除充值记录
+@@ -73,7 +94,6 @@ public class RechargeRecordController extends BaseController {
+         return JsonResult.success("删除充值记录成功");
+     }
+ 
+-
+     /**
+      * 充值界面
+      *
+@@ -89,8 +109,8 @@ public class RechargeRecordController extends BaseController {
+     /**
+      * 充值保存
+      *
+-     * @param money
+-     * @return
++     * @param money 充值金额
++     * @return JsonResult
+      */
+     @PostMapping(value = "/save")
+     @ResponseBody
+@@ -98,20 +118,7 @@ public class RechargeRecordController extends BaseController {
+         if (money > 10000 || money < 10) {
+             return JsonResult.error("充值金额不合法(最少10元，最多1万元)");
+         }
+-        // 充值操作
+-        // 忽略，假设直接充值成功
+-        // 修改余额
+-        User loginUser = getLoginUser();
+-        User user = userService.get(loginUser.getId());
+-        user.setMoney(user.getMoney() + money);
+-        userService.insertOrUpdate(user);
+-
+-        // 添加充值记录
+-        RechargeRecord rechargeRecord = new RechargeRecord();
+-        rechargeRecord.setUserId(loginUser.getId());
+-        rechargeRecord.setMoney(money);
+-        rechargeRecord.setCreateTime(new Date());
+-        rechargeRecordService.insert(rechargeRecord);
+-        return JsonResult.success("充值成功", user.getMoney());
++        Long currentMoney = userService.recharge(getLoginUserId(), BigDecimal.valueOf(money));
++        return JsonResult.success("充值成功", currentMoney);
+     }
+ }
+diff --git a/src/main/java/com/example/sens/service/RechargeRecordService.java b/src/main/java/com/example/sens/service/RechargeRecordService.java
+index 414e5be..4011108 100644
+--- a/src/main/java/com/example/sens/service/RechargeRecordService.java
++++ b/src/main/java/com/example/sens/service/RechargeRecordService.java
+@@ -1,6 +1,5 @@
+ package com.example.sens.service;
+ 
+-
+ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+ import com.example.sens.common.base.BaseService;
+ import com.example.sens.entity.RechargeRecord;
+@@ -9,28 +8,47 @@ import com.example.sens.entity.RechargeRecord;
+  * @author 言曌
+  * @date 2020/3/22 3:18 下午
+  */
+-
+ public interface RechargeRecordService extends BaseService<RechargeRecord, Long> {
+ 
+-
+     Page<RechargeRecord> findAll(String startDate, String endDate, Page<RechargeRecord> page);
+ 
+     /**
+-     * 根据用户ID获得预定列表
++     * 根据用户ID获得充值记录
+      *
+-     * @param userId
+-     * @param page
+-     * @return
++     * @param startDate 开始日期
++     * @param endDate 结束日期
++     * @param userId 用户ID
++     * @param page 分页信息
++     * @return 充值记录分页列表
+      */
+     Page<RechargeRecord> findByUserId(String startDate, String endDate, Long userId, Page<RechargeRecord> page);
+ 
+-
+     /**
+      * 根据时间范围查询总金额
+      *
+-     * @param startDate
+-     * @param endDate
+-     * @return
++     * @param startDate 开始日期
++     * @param endDate 结束日期
++     * @return 总金额
++     */
++    Long getTotalMoneySum(String startDate, String endDate);
++
++    /**
++     * 根据时间范围和用户查询总金额
++     *
++     * @param startDate 开始日期
++     * @param endDate 结束日期
++     * @param userId 用户ID
++     * @return 总金额
++     */
++    Long getTotalMoneySum(String startDate, String endDate, Long userId);
++
++    /**
++     * 根据时间范围和用户统计充值记录数
++     *
++     * @param startDate 开始日期
++     * @param endDate 结束日期
++     * @param userId 用户ID
++     * @return 充值记录数
+      */
+-    Integer getTotalMoneySum(String startDate, String endDate);
++    long countByCondition(String startDate, String endDate, Long userId);
+ }
+diff --git a/src/main/java/com/example/sens/service/UserService.java b/src/main/java/com/example/sens/service/UserService.java
+index ec5df4e..b4285b6 100755
+--- a/src/main/java/com/example/sens/service/UserService.java
++++ b/src/main/java/com/example/sens/service/UserService.java
+@@ -4,6 +4,8 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+ import com.example.sens.common.base.BaseService;
+ import com.example.sens.entity.User;
+ 
++import java.math.BigDecimal;
++
+ /**
+  * 用户业务逻辑接口
+  */
+@@ -44,4 +46,13 @@ public interface UserService extends BaseService<User, Long> {
+      */
+     Page<User> findByRoleAndCondition(String roleName, User condition, Page<User> page);
+ 
++    /**
++     * 用户充值并记录充值流水
++     *
++     * @param userId 用户ID
++     * @param amount 充值金额
++     * @return 充值后的余额
++     */
++    Long recharge(Long userId, BigDecimal amount);
++
+ }
+diff --git a/src/main/java/com/example/sens/service/impl/RechargeRecordServiceImpl.java b/src/main/java/com/example/sens/service/impl/RechargeRecordServiceImpl.java
+index ba95206..1c7b565 100644
+--- a/src/main/java/com/example/sens/service/impl/RechargeRecordServiceImpl.java
++++ b/src/main/java/com/example/sens/service/impl/RechargeRecordServiceImpl.java
+@@ -1,14 +1,22 @@
+ package com.example.sens.service.impl;
+ 
++import cn.hutool.core.util.StrUtil;
+ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+ import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+ import com.example.sens.entity.RechargeRecord;
++import com.example.sens.entity.User;
+ import com.example.sens.mapper.RechargeRecordMapper;
++import com.example.sens.mapper.UserMapper;
+ import com.example.sens.service.RechargeRecordService;
+ import org.springframework.beans.factory.annotation.Autowired;
+ import org.springframework.stereotype.Service;
+ 
++import java.util.List;
++import java.util.Map;
++import java.util.Objects;
++import java.util.stream.Collectors;
++
+ /**
+  * @author 言曌
+  * @date 2020/3/22 3:19 下午
+@@ -19,6 +27,9 @@ public class RechargeRecordServiceImpl implements RechargeRecordService {
+     @Autowired
+     private RechargeRecordMapper rechargeRecordMapper;
+ 
++    @Autowired
++    private UserMapper userMapper;
++
+     @Override
+     public BaseMapper<RechargeRecord> getRepository() {
+         return rechargeRecordMapper;
+@@ -26,7 +37,6 @@ public class RechargeRecordServiceImpl implements RechargeRecordService {
+ 
+     @Override
+     public QueryWrapper<RechargeRecord> getQueryWrapper(RechargeRecord rechargeRecord) {
+-        //对指定字段查询
+         QueryWrapper<RechargeRecord> queryWrapper = new QueryWrapper<>();
+         if (rechargeRecord != null) {
+             if (rechargeRecord.getUserId() != null) {
+@@ -38,16 +48,67 @@ public class RechargeRecordServiceImpl implements RechargeRecordService {
+ 
+     @Override
+     public Page<RechargeRecord> findAll(String startDate, String endDate, Page<RechargeRecord> page) {
+-        return page.setRecords(rechargeRecordMapper.findAll(startDate, endDate, page));
++        rechargeRecordMapper.selectPage(page, buildQueryWrapper(startDate, endDate, null));
++        fillUsers(page.getRecords());
++        return page;
+     }
+ 
+     @Override
+     public Page<RechargeRecord> findByUserId(String startDate, String endDate, Long userId, Page<RechargeRecord> page) {
+-        return page.setRecords(rechargeRecordMapper.findByUserId(startDate, endDate, userId, page));
++        rechargeRecordMapper.selectPage(page, buildQueryWrapper(startDate, endDate, userId));
++        fillUsers(page.getRecords());
++        return page;
++    }
++
++    @Override
++    public Long getTotalMoneySum(String startDate, String endDate) {
++        return getTotalMoneySum(startDate, endDate, null);
+     }
+ 
+     @Override
+-    public Integer getTotalMoneySum(String startDate, String endDate) {
+-        return rechargeRecordMapper.getTotalMoneySum(startDate, endDate);
++    public Long getTotalMoneySum(String startDate, String endDate, Long userId) {
++        return rechargeRecordMapper.selectList(buildQueryWrapper(startDate, endDate, userId)).stream()
++                .map(RechargeRecord::getMoney)
++                .filter(Objects::nonNull)
++                .mapToLong(Long::longValue)
++                .sum();
++    }
++
++    @Override
++    public long countByCondition(String startDate, String endDate, Long userId) {
++        return count(buildQueryWrapper(startDate, endDate, userId));
++    }
++
++    private QueryWrapper<RechargeRecord> buildQueryWrapper(String startDate, String endDate, Long userId) {
++        QueryWrapper<RechargeRecord> queryWrapper = new QueryWrapper<>();
++        if (StrUtil.isNotBlank(startDate)) {
++            queryWrapper.ge("create_time", cn.hutool.core.date.DateUtil.parseDate(startDate));
++        }
++        if (StrUtil.isNotBlank(endDate)) {
++            queryWrapper.lt("create_time", cn.hutool.core.date.DateUtil.offsetDay(cn.hutool.core.date.DateUtil.parseDate(endDate), 1));
++        }
++        if (userId != null) {
++            queryWrapper.eq("user_id", userId);
++        }
++        return queryWrapper;
++    }
++
++    private void fillUsers(List<RechargeRecord> rechargeRecords) {
++        if (rechargeRecords == null || rechargeRecords.isEmpty()) {
++            return;
++        }
++        List<Long> userIds = rechargeRecords.stream()
++                .map(RechargeRecord::getUserId)
++                .filter(Objects::nonNull)
++                .distinct()
++                .collect(Collectors.toList());
++        if (userIds.isEmpty()) {
++            return;
++        }
++        Map<Long, User> userMap = userMapper.selectBatchIds(userIds).stream()
++                .collect(Collectors.toMap(User::getId, user -> user));
++        for (RechargeRecord rechargeRecord : rechargeRecords) {
++            rechargeRecord.setUser(userMap.get(rechargeRecord.getUserId()));
++        }
+     }
+ }
+diff --git a/src/main/java/com/example/sens/service/impl/UserServiceImpl.java b/src/main/java/com/example/sens/service/impl/UserServiceImpl.java
+index f27be88..db1fa27 100644
+--- a/src/main/java/com/example/sens/service/impl/UserServiceImpl.java
++++ b/src/main/java/com/example/sens/service/impl/UserServiceImpl.java
+@@ -4,13 +4,14 @@ import cn.hutool.core.util.StrUtil;
+ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+ import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+-import com.example.sens.exception.MyBusinessException;
+ import com.example.sens.common.constant.CommonConstant;
++import com.example.sens.entity.RechargeRecord;
+ import com.example.sens.entity.Role;
++import com.example.sens.entity.User;
++import com.example.sens.exception.MyBusinessException;
+ import com.example.sens.mapper.OrderMapper;
+ import com.example.sens.mapper.RechargeRecordMapper;
+ import com.example.sens.mapper.UserMapper;
+-import com.example.sens.entity.User;
+ import com.example.sens.service.RoleService;
+ import com.example.sens.service.UserService;
+ import com.example.sens.util.Md5Util;
+@@ -21,7 +22,13 @@ import org.springframework.beans.factory.annotation.Autowired;
+ import org.springframework.stereotype.Service;
+ import org.springframework.transaction.annotation.Transactional;
+ 
+-import java.util.*;
++import java.math.BigDecimal;
++import java.util.ArrayList;
++import java.util.Date;
++import java.util.HashMap;
++import java.util.List;
++import java.util.Map;
++import java.util.Objects;
+ 
+ /**
+  * 用户业务逻辑实现类
+@@ -77,6 +84,40 @@ public class UserServiceImpl implements UserService {
+         return page.setRecords(users);
+     }
+ 
++    @Override
++    @Transactional(rollbackFor = Exception.class)
++    public Long recharge(Long userId, BigDecimal amount) {
++        if (userId == null) {
++            throw new MyBusinessException("用户不存在");
++        }
++        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
++            throw new MyBusinessException("充值金额不合法");
++        }
++
++        Long rechargeMoney;
++        try {
++            rechargeMoney = amount.longValueExact();
++        } catch (ArithmeticException e) {
++            throw new MyBusinessException("充值金额必须为整数");
++        }
++
++        User user = get(userId);
++        if (user == null) {
++            throw new MyBusinessException("用户不存在");
++        }
++
++        Long currentMoney = user.getMoney() == null ? 0L : user.getMoney();
++        user.setMoney(currentMoney + rechargeMoney);
++        userMapper.updateById(user);
++
++        RechargeRecord rechargeRecord = new RechargeRecord();
++        rechargeRecord.setUserId(userId);
++        rechargeRecord.setMoney(rechargeMoney);
++        rechargeRecord.setCreateTime(new Date());
++        rechargeRecordMapper.insert(rechargeRecord);
++        return user.getMoney();
++    }
++
+     @Override
+     public BaseMapper<User> getRepository() {
+         return userMapper;
+@@ -84,7 +125,6 @@ public class UserServiceImpl implements UserService {
+ 
+     @Override
+     public QueryWrapper<User> getQueryWrapper(User user) {
+-        //对指定字段查询
+         QueryWrapper<User> queryWrapper = new QueryWrapper<>();
+         if (user != null) {
+             if (StrUtil.isNotBlank(user.getUserName())) {
+@@ -99,28 +139,21 @@ public class UserServiceImpl implements UserService {
+ 
+     @Override
+     public User insert(User user) {
+-        // 1.检查长度
+         basicCheck(user);
+-        // 2.验证账号和身份证号码是否存在
+         checkUserNameAndIdCard(user);
+-        // 3.添加
+         userMapper.insert(user);
+         return user;
+     }
+ 
+     @Override
+     public User update(User user) {
+-        // 1.检查长度
+         basicCheck(user);
+-        // 2.验证账号和身份证号码是否存在
+         checkUserNameAndIdCard(user);
+-        // 3.更新
+         userMapper.updateById(user);
+         return user;
+     }
+ 
+     private void checkUserNameAndIdCard(User user) {
+-        //验证账号和身份证号码是否存在
+         if (user.getUserName() != null) {
+             User nameCheck = findByUserName(user.getUserName());
+             Boolean isExist = (user.getId() == null && nameCheck != null) ||
+@@ -142,14 +175,10 @@ public class UserServiceImpl implements UserService {
+     @Override
+     @Transactional(rollbackFor = Exception.class)
+     public void delete(Long userId) {
+-        //删除用户
+         User user = get(userId);
+         if (user != null) {
+-            // 1.修改用户状态为已删除
+             userMapper.deleteById(userId);
+-            // 2.修改用户和角色关联
+             roleService.deleteByUserId(userId);
+-            // 3.删除订单
+             Map<String, Object> map = new HashMap<>();
+             map.put("user_id", userId);
+             orderMapper.deleteByMap(map);
+@@ -158,7 +187,6 @@ public class UserServiceImpl implements UserService {
+             map.put("owner_user_id", userId);
+             orderMapper.deleteByMap(map2);
+ 
+-            // 4.删除充值记录
+             rechargeRecordMapper.deleteByUserId(userId);
+         }
+     }
+@@ -178,15 +206,12 @@ public class UserServiceImpl implements UserService {
+         String userName = user.getUserName();
+         String idCard = user.getIdCard();
+         String userDisplayName = user.getUserDisplayName();
+-        // 1.身份证号码是否合法
+         if (StringUtils.isNotEmpty(idCard) && !RegexUtil.isIdCard(idCard)) {
+             throw new MyBusinessException("身份证号码不合法，请输入15或18位");
+         }
+-        // 2.账号码长度是否合法
+         if (StringUtils.isNotEmpty(userName) && userName.length() > 20 || userName.length() < 2) {
+             throw new MyBusinessException("账号不合法，请输入2-20位");
+         }
+-        // 3.姓名长度是否合法
+         if (StringUtils.isNotEmpty(userDisplayName) && userDisplayName.length() > 20 || userDisplayName.length() < 2) {
+             throw new MyBusinessException("姓名长度不合法，请输入2-20位");
+         }
