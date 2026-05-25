@@ -98,20 +98,13 @@ public class RechargeRecordController extends BaseController {
         if (money > 10000 || money < 10) {
             return JsonResult.error("充值金额不合法(最少10元，最多1万元)");
         }
-        // 充值操作
-        // 忽略，假设直接充值成功
-        // 修改余额
+        // 使用 UserService 的 recharge 方法完成充值
         User loginUser = getLoginUser();
+        // 直接使用 BigDecimal 包装 Long 类型的 money（以分为单位）
+        userService.recharge(loginUser.getId(), new BigDecimal(money));
+        
+        // 获取更新后的用户信息返回
         User user = userService.get(loginUser.getId());
-        user.setMoney(user.getMoney() + money);
-        userService.insertOrUpdate(user);
-
-        // 添加充值记录
-        RechargeRecord rechargeRecord = new RechargeRecord();
-        rechargeRecord.setUserId(loginUser.getId());
-        rechargeRecord.setMoney(money);
-        rechargeRecord.setCreateTime(new Date());
-        rechargeRecordService.insert(rechargeRecord);
         return JsonResult.success("充值成功", user.getMoney());
     }
 }

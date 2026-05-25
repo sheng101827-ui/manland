@@ -4,6 +4,7 @@ import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.example.sens.entity.RechargeRecord;
 import com.example.sens.exception.MyBusinessException;
 import com.example.sens.common.constant.CommonConstant;
 import com.example.sens.entity.Role;
@@ -11,6 +12,7 @@ import com.example.sens.mapper.OrderMapper;
 import com.example.sens.mapper.RechargeRecordMapper;
 import com.example.sens.mapper.UserMapper;
 import com.example.sens.entity.User;
+import com.example.sens.service.RechargeRecordService;
 import com.example.sens.service.RoleService;
 import com.example.sens.service.UserService;
 import com.example.sens.util.Md5Util;
@@ -21,6 +23,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.*;
 
 /**
@@ -40,6 +43,9 @@ public class UserServiceImpl implements UserService {
 
     @Autowired
     private RechargeRecordMapper rechargeRecordMapper;
+
+    @Autowired
+    private RechargeRecordService rechargeRecordService;
 
     @Override
     public User findByUserName(String userName) {
@@ -196,5 +202,29 @@ public class UserServiceImpl implements UserService {
     public User get(Long id) {
         User user = userMapper.selectById(id);
         return user;
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void recharge(Long userId, BigDecimal amount) {
+        // 1. 使用 MP 查询用户
+        User user = getById(userId);
+        if (user == null) {
+            throw new MyBusinessException("用户不存在");
+        }
+
+        // 2. 在 Java 中计算余额（注意：User 实体中 money 是 Long 类型，这里直接使用 amount 作为分）
+        Long currentMoney = user.getMoney() == null ? 0L : user.getMoney();
+        Long rechargeMoney = amount.longValue();
+        user.setMoney(currentMoney + rechargeMoney);
+
+        // 3. 使用 MP 更新用户
+        updateById(user);
+
+        // 4. 记录充值流水
+        RechargeRecord record = new RechargeRecord();
+        record.setUserId(userId);
+        record.setMoney(rechargeMoney);
+        rechargeRecordService.insert(record);
     }
 }
