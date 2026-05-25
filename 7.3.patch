@@ -1,0 +1,109 @@
+diff --git a/src/main/java/com/example/sens/controller/admin/RechargeRecordController.java b/src/main/java/com/example/sens/controller/admin/RechargeRecordController.java
+index 72c5e16..84120d8 100644
+--- a/src/main/java/com/example/sens/controller/admin/RechargeRecordController.java
++++ b/src/main/java/com/example/sens/controller/admin/RechargeRecordController.java
+@@ -14,7 +14,7 @@ import org.springframework.stereotype.Controller;
+ import org.springframework.ui.Model;
+ import org.springframework.web.bind.annotation.*;
+ 
+-import java.util.Date;
++import java.math.BigDecimal;
+ 
+ /**
+  * @author 言曌
+@@ -98,20 +98,9 @@ public class RechargeRecordController extends BaseController {
+         if (money > 10000 || money < 10) {
+             return JsonResult.error("充值金额不合法(最少10元，最多1万元)");
+         }
+-        // 充值操作
+-        // 忽略，假设直接充值成功
+-        // 修改余额
+         User loginUser = getLoginUser();
++        RechargeRecord rechargeRecord = userService.recharge(loginUser.getId(), BigDecimal.valueOf(money));
+         User user = userService.get(loginUser.getId());
+-        user.setMoney(user.getMoney() + money);
+-        userService.insertOrUpdate(user);
+-
+-        // 添加充值记录
+-        RechargeRecord rechargeRecord = new RechargeRecord();
+-        rechargeRecord.setUserId(loginUser.getId());
+-        rechargeRecord.setMoney(money);
+-        rechargeRecord.setCreateTime(new Date());
+-        rechargeRecordService.insert(rechargeRecord);
+         return JsonResult.success("充值成功", user.getMoney());
+     }
+ }
+diff --git a/src/main/java/com/example/sens/service/UserService.java b/src/main/java/com/example/sens/service/UserService.java
+index ec5df4e..6c6602a 100755
+--- a/src/main/java/com/example/sens/service/UserService.java
++++ b/src/main/java/com/example/sens/service/UserService.java
+@@ -2,8 +2,11 @@ package com.example.sens.service;
+ 
+ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+ import com.example.sens.common.base.BaseService;
++import com.example.sens.entity.RechargeRecord;
+ import com.example.sens.entity.User;
+ 
++import java.math.BigDecimal;
++
+ /**
+  * 用户业务逻辑接口
+  */
+@@ -44,4 +47,13 @@ public interface UserService extends BaseService<User, Long> {
+      */
+     Page<User> findByRoleAndCondition(String roleName, User condition, Page<User> page);
+ 
++    /**
++     * 用户充值
++     *
++     * @param userId 用户ID
++     * @param amount 充值金额
++     * @return 充值记录
++     */
++    RechargeRecord recharge(Long userId, BigDecimal amount);
++
+ }
+diff --git a/src/main/java/com/example/sens/service/impl/UserServiceImpl.java b/src/main/java/com/example/sens/service/impl/UserServiceImpl.java
+index f27be88..ed4461f 100644
+--- a/src/main/java/com/example/sens/service/impl/UserServiceImpl.java
++++ b/src/main/java/com/example/sens/service/impl/UserServiceImpl.java
+@@ -7,6 +7,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+ import com.example.sens.exception.MyBusinessException;
+ import com.example.sens.common.constant.CommonConstant;
+ import com.example.sens.entity.Role;
++import com.example.sens.entity.RechargeRecord;
+ import com.example.sens.mapper.OrderMapper;
+ import com.example.sens.mapper.RechargeRecordMapper;
+ import com.example.sens.mapper.UserMapper;
+@@ -23,6 +24,8 @@ import org.springframework.transaction.annotation.Transactional;
+ 
+ import java.util.*;
+ 
++import java.math.BigDecimal;
++
+ /**
+  * 用户业务逻辑实现类
+  */
+@@ -197,4 +200,22 @@ public class UserServiceImpl implements UserService {
+         User user = userMapper.selectById(id);
+         return user;
+     }
++
++    @Override
++    @Transactional(rollbackFor = Exception.class)
++    public RechargeRecord recharge(Long userId, BigDecimal amount) {
++        User user = get(userId);
++        if (user == null) {
++            throw new MyBusinessException("用户不存在");
++        }
++        user.setMoney(user.getMoney() + amount.longValue());
++        userMapper.updateById(user);
++
++        RechargeRecord rechargeRecord = new RechargeRecord();
++        rechargeRecord.setUserId(userId);
++        rechargeRecord.setMoney(amount.longValue());
++        rechargeRecord.setCreateTime(new Date());
++        rechargeRecordMapper.insert(rechargeRecord);
++        return rechargeRecord;
++    }
+ }
