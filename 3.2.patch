@@ -1,0 +1,118 @@
+diff --git a/src/main/java/com/example/sens/entity/House.java b/src/main/java/com/example/sens/entity/House.java
+new file mode 100644
+index 0000000..e69de29
+--- /dev/null
++++ b/src/main/java/com/example/sens/entity/House.java
+@@ -0,0 +1,23 @@
++package com.example.sens.entity;
++
++import com.baomidou.mybatisplus.annotation.IdType;
++import com.baomidou.mybatisplus.annotation.TableId;
++import com.baomidou.mybatisplus.annotation.TableName;
++import lombok.Data;
++
++@Data
++@TableName("sys_house")
++public class House {
++    @TableId(type = IdType.AUTO)
++    private Long id;
++    
++    /**
++     * 房屋状态：0-未预定，1-已预定
++     */
++    private Integer status;
++    
++    /**
++     * 预定用户的ID
++     */
++    private Long userId;
++}
+diff --git a/src/main/java/com/example/sens/mapper/HouseMapper.java b/src/main/java/com/example/sens/mapper/HouseMapper.java
+new file mode 100644
+index 0000000..e69de29
+--- /dev/null
++++ b/src/main/java/com/example/sens/mapper/HouseMapper.java
+@@ -0,0 +1,9 @@
++package com.example.sens.mapper;
++
++import com.baomidou.mybatisplus.core.mapper.BaseMapper;
++import com.example.sens.entity.House;
++import org.apache.ibatis.annotations.Mapper;
++
++@Mapper
++public interface HouseMapper extends BaseMapper<House> {
++}
+diff --git a/src/main/java/com/example/sens/service/HouseService.java b/src/main/java/com/example/sens/service/HouseService.java
+new file mode 100644
+index 0000000..e69de29
+--- /dev/null
++++ b/src/main/java/com/example/sens/service/HouseService.java
+@@ -0,0 +1,14 @@
++package com.example.sens.service;
++
++import com.baomidou.mybatisplus.extension.service.IService;
++import com.example.sens.entity.House;
++
++public interface HouseService extends IService<House> {
++    
++    /**
++     * 预定房屋
++     * @param houseId 房屋ID
++     * @param userId 租客ID
++     */
++    void bookHouse(Long houseId, Long userId);
++}
+diff --git a/src/main/java/com/example/sens/service/impl/HouseServiceImpl.java b/src/main/java/com/example/sens/service/impl/HouseServiceImpl.java
+new file mode 100644
+index 0000000..e69de29
+--- /dev/null
++++ b/src/main/java/com/example/sens/service/impl/HouseServiceImpl.java
+@@ -0,0 +1,48 @@
++package com.example.sens.service.impl;
++
++import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
++import com.example.sens.entity.House;
++import com.example.sens.mapper.HouseMapper;
++import com.example.sens.service.HouseService;
++import org.springframework.beans.factory.annotation.Autowired;
++import org.springframework.stereotype.Service;
++import org.springframework.transaction.support.TransactionTemplate;
++
++@Service
++public class HouseServiceImpl extends ServiceImpl<HouseMapper, House> implements HouseService {
++
++    @Autowired
++    private TransactionTemplate transactionTemplate;
++
++    @Override
++    public void bookHouse(Long houseId, Long userId) {
++        // 使用 houseId 的字符串调用 intern() 方法作为锁对象
++        // 这样可以保证针对同一套房子的并发请求会被同步，而不同房子的请求可以并发执行，提升性能
++        synchronized (String.valueOf(houseId).intern()) {
++            // 使用 transactionTemplate 编程式事务
++            // 确保在锁释放之前，事务已经完全提交，避免事务未提交导致下一个拿到锁的线程读到旧数据
++            transactionTemplate.execute(status -> {
++                // 1. 查询房屋最新状态
++                House house = this.getById(houseId);
++                
++                if (house == null) {
++                    throw new RuntimeException("房屋不存在");
++                }
++                
++                // 2. 判断房屋是否已经被预定（假设 status=1 表示已预定，0表示未预定）
++                if (house.getStatus() != null && house.getStatus() == 1) {
++                    throw new RuntimeException("手慢了，该房屋已被预定");
++                }
++                
++                // 3. 更新房屋状态和租客信息
++                house.setStatus(1);
++                house.setUserId(userId);
++                
++                // 4. 使用 MyBatis-Plus 的 updateById 来更新房屋状态
++                this.updateById(house);
++                
++                return null;
++            });
++        }
++    }
++}
