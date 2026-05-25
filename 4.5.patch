@@ -1,0 +1,164 @@
+diff --git a/src/main/java/com/example/sens/controller/admin/HouseController.java b/src/main/java/com/example/sens/controller/admin/HouseController.java
+new file mode 100644
+index 0000000..5a91117
+--- /dev/null
++++ b/src/main/java/com/example/sens/controller/admin/HouseController.java
+@@ -0,0 +1,28 @@
++package com.example.sens.controller.admin;
++
++import com.example.sens.controller.common.BaseController;
++import com.example.sens.dto.JsonResult;
++import com.example.sens.entity.House;
++import com.example.sens.service.HouseService;
++import org.springframework.beans.factory.annotation.Autowired;
++import org.springframework.web.bind.annotation.PostMapping;
++import org.springframework.web.bind.annotation.RequestBody;
++import org.springframework.web.bind.annotation.RequestMapping;
++import org.springframework.web.bind.annotation.ResponseBody;
++
++import java.util.Date;
++
++@RequestMapping(value = "/admin/house")
++public class HouseController extends BaseController {
++
++    @Autowired
++    private HouseService houseService;
++
++    @PostMapping(value = "/add")
++    @ResponseBody
++    public JsonResult addHouse(@RequestBody House house) {
++        house.setCreateTime(new Date());
++        houseService.save(house);
++        return JsonResult.success("添加成功");
++    }
++}
+\ No newline at end of file
+diff --git a/src/main/java/com/example/sens/entity/House.java b/src/main/java/com/example/sens/entity/House.java
+new file mode 100644
+index 0000000..6a2ec56
+--- /dev/null
++++ b/src/main/java/com/example/sens/entity/House.java
+@@ -0,0 +1,43 @@
++package com.example.sens.entity;
++
++import com.baomidou.mybatisplus.annotation.TableField;
++import com.baomidou.mybatisplus.annotation.TableName;
++import com.example.sens.common.base.BaseEntity;
++import lombok.Data;
++
++import java.util.Date;
++
++@Data
++@TableName("house")
++public class House extends BaseEntity {
++
++    private Long landlordId;
++
++    private String title;
++
++    private String description;
++
++    private String address;
++
++    private Integer price;
++
++    private Integer area;
++
++    private String thumbnail;
++
++    private Integer roomCount;
++
++    private Integer toiletCount;
++
++    private Integer status;
++
++    private String city;
++
++    private String district;
++
++    @TableField(exist = false)
++    private User landlord;
++
++    @TableField(exist = false)
++    private Category category;
++}
+\ No newline at end of file
+diff --git a/src/main/java/com/example/sens/mapper/HouseMapper.java b/src/main/java/com/example/sens/mapper/HouseMapper.java
+new file mode 100644
+index 0000000..be2368a
+--- /dev/null
++++ b/src/main/java/com/example/sens/mapper/HouseMapper.java
+@@ -0,0 +1,9 @@
++package com.example.sens.mapper;
++
++import com.baomidou.mybatisplus.core.mapper.BaseMapper;
++import com.example.sens.entity.House;
++import org.apache.ibatis.annotations.Mapper;
++
++@Mapper
++public interface HouseMapper extends BaseMapper<House> {
++}
+\ No newline at end of file
+diff --git a/src/main/java/com/example/sens/service/HouseService.java b/src/main/java/com/example/sens/service/HouseService.java
+new file mode 100644
+index 0000000..94aedc4
+--- /dev/null
++++ b/src/main/java/com/example/sens/service/HouseService.java
+@@ -0,0 +1,7 @@
++package com.example.sens.service;
++
++import com.example.sens.common.base.BaseService;
++import com.example.sens.entity.House;
++
++public interface HouseService extends BaseService<House, Long> {
++}
+\ No newline at end of file
+diff --git a/src/main/java/com/example/sens/service/impl/HouseServiceImpl.java b/src/main/java/com/example/sens/service/impl/HouseServiceImpl.java
+new file mode 100644
+index 0000000..9c87c75
+--- /dev/null
++++ b/src/main/java/com/example/sens/service/impl/HouseServiceImpl.java
+@@ -0,0 +1,42 @@
++package com.example.sens.service.impl;
++
++import com.baomidou.mybatisplus.core.mapper.BaseMapper;
++import com.example.sens.common.base.BaseService;
++import com.example.sens.entity.House;
++import com.example.sens.mapper.HouseMapper;
++import org.springframework.beans.factory.annotation.Autowired;
++import org.springframework.stereotype.Service;
++
++@Service
++public class HouseServiceImpl implements HouseService {
++
++    @Autowired
++    private HouseMapper houseMapper;
++
++    @Override
++    public BaseMapper<House> getRepository() {
++        return houseMapper;
++    }
++
++    @Override
++    public House insert(House house) {
++        houseMapper.insert(house);
++        return house;
++    }
++
++    @Override
++    public House update(House house) {
++        houseMapper.updateById(house);
++        return house;
++    }
++
++    @Override
++    public House save(House house) {
++        if (house.getId() != null) {
++            houseMapper.updateById(house);
++        } else {
++            houseMapper.insert(house);
++        }
++        return house;
++    }
++}
+\ No newline at end of file
