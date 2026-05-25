@@ -160,6 +160,16 @@ public interface BaseService<E, ID extends Serializable> {
     }
 
     /**
+     * 根据条件查询列表
+     *
+     * @param queryWrapper
+     * @return
+     */
+    default List<E> list(QueryWrapper<E> queryWrapper) {
+        return getRepository().selectList(queryWrapper);
+    }
+
+    /**
      * 根据查询条件不分页获取
      *
      * @param condition
@@ -230,4 +240,3 @@ public interface BaseService<E, ID extends Serializable> {
     }
 
 }
-

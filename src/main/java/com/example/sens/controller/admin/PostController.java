@@ -86,6 +86,16 @@ public class PostController extends BaseController {
         return "admin/admin_post";
     }
 
+    @GetMapping("/area")
+    @ResponseBody
+    public JsonResult getPostsByArea(@RequestParam("minArea") Integer minArea,
+                                     @RequestParam("maxArea") Integer maxArea,
+                                     @RequestParam(value = "page", defaultValue = "1") Integer pageNumber,
+                                     @RequestParam(value = "size", defaultValue = "10") Integer pageSize) {
+        List<Post> postList = postService.getByArea(minArea, maxArea, pageNumber, pageSize);
+        return JsonResult.success("查询成功", postList);
+    }
+
     /**
      * 我的出租
      *

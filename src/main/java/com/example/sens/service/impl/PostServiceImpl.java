@@ -12,6 +12,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Collections;
 import java.util.List;
 
 
@@ -38,6 +39,36 @@ public class PostServiceImpl implements PostService {
     public Page<Post> findByRentUserId(Long userId, Page<Post> page) {
         List<Post> postList = postMapper.findByRentUserId(userId, page);
         return page.setRecords(postList);
+    }
+
+    @Override
+    public List<Post> getByArea(int minArea, int maxArea, int page, int size) {
+        if (maxArea < minArea) {
+            return Collections.emptyList();
+        }
+        if (page < 1) {
+            page = 1;
+        }
+        if (size < 1) {
+            size = 10;
+        }
+
+        QueryWrapper<Post> queryWrapper = new QueryWrapper<>();
+        queryWrapper.ge("area", minArea)
+            .le("area", maxArea)
+            .orderByDesc("create_time");
+
+        List<Post> postList = list(queryWrapper);
+        if (postList == null || postList.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        int fromIndex = (page - 1) * size;
+        if (fromIndex >= postList.size()) {
+            return Collections.emptyList();
+        }
+        int toIndex = Math.min(fromIndex + size, postList.size());
+        return postList.subList(fromIndex, toIndex);
     }
 
 
@@ -120,4 +151,3 @@ public class PostServiceImpl implements PostService {
     }
 
 }
-

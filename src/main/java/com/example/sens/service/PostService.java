@@ -30,6 +30,16 @@ public interface PostService extends BaseService<Post, Long> {
      */
     Page<Post> findByRentUserId(Long userId, Page<Post> page);
 
+    /**
+     * 按面积分页查询房屋
+     *
+     * @param minArea 最小面积
+     * @param maxArea 最大面积
+     * @param page 页码
+     * @param size 每页数量
+     * @return 当前页房屋列表
+     */
+    List<Post> getByArea(int minArea, int maxArea, int page, int size);
 
     /**
      * 获得最新房屋
