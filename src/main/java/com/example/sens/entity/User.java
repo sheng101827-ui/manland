@@ -79,4 +79,12 @@ public class User extends BaseEntity {
     @TableField(exist = false)
     private Role role;
 
+    public java.math.BigDecimal getBalance() {
+        return money == null ? java.math.BigDecimal.ZERO : java.math.BigDecimal.valueOf(money);
+    }
+
+    public void setBalance(java.math.BigDecimal balance) {
+        this.money = balance != null ? balance.longValue() : 0L;
+    }
+
 }

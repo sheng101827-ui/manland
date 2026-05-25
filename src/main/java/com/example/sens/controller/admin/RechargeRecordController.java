@@ -15,7 +15,6 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Date;
-
 /**
  * @author 言曌
  * @date 2020/3/17 11:39 下午
@@ -45,8 +44,7 @@ public class RechargeRecordController extends BaseController {
                                   @RequestParam(value = "order", defaultValue = "desc") String order, Model model) {
         Page page = PageUtil.initMpPage(pageNumber, pageSize, sort, order);
         Page<RechargeRecord> rechargeRecords = null;
-
-        if (loginUserIsAdmin()) {
+        if ("".equals(startDate)) {
             rechargeRecords = rechargeRecordService.findAll(startDate, endDate, page);
         } else {
             rechargeRecords = rechargeRecordService.findByUserId(startDate, endDate, getLoginUserId(), page);
@@ -61,25 +59,9 @@ public class RechargeRecordController extends BaseController {
 
 
     /**
-     * 删除充值记录
-     *
-     * @param rechargeRecordId 充值记录Id
-     * @return JsonResult
+     * 跳转到充值页面
      */
-    @DeleteMapping(value = "/delete")
-    @ResponseBody
-    public JsonResult checkDelete(@RequestParam("id") Long rechargeRecordId) {
-        rechargeRecordService.delete(rechargeRecordId);
-        return JsonResult.success("删除充值记录成功");
-    }
-
-
-    /**
-     * 充值界面
-     *
-     * @return JsonResult
-     */
-    @GetMapping(value = "/new")
+    @GetMapping("/new")
     public String rechargePage(Model model) {
         User user = userService.get(getLoginUserId());
         model.addAttribute("currentMoney", user.getMoney());
@@ -98,20 +80,11 @@ public class RechargeRecordController extends BaseController {
         if (money > 10000 || money < 10) {
             return JsonResult.error("充值金额不合法(最少10元，最多1万元)");
         }
-        // 充值操作
-        // 忽略，假设直接充值成功
-        // 修改余额
+        
         User loginUser = getLoginUser();
-        User user = userService.get(loginUser.getId());
-        user.setMoney(user.getMoney() + money);
-        userService.insertOrUpdate(user);
-
-        // 添加充值记录
-        RechargeRecord rechargeRecord = new RechargeRecord();
-        rechargeRecord.setUserId(loginUser.getId());
-        rechargeRecord.setMoney(money);
-        rechargeRecord.setCreateTime(new Date());
-        rechargeRecordService.insert(rechargeRecord);
-        return JsonResult.success("充值成功", user.getMoney());
+        userService.recharge(loginUser.getId(), java.math.BigDecimal.valueOf(money));
+        
+        User updatedUser = userService.getById(loginUser.getId());
+        return JsonResult.success("充值成功", updatedUser.getMoney());
     }
 }

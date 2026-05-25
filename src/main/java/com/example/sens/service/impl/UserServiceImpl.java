@@ -5,13 +5,12 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.example.sens.exception.MyBusinessException;
-import com.example.sens.common.constant.CommonConstant;
+import com.example.sens.exception.MyBusinessException;
 import com.example.sens.entity.Role;
-import com.example.sens.mapper.OrderMapper;
-import com.example.sens.mapper.RechargeRecordMapper;
 import com.example.sens.mapper.UserMapper;
 import com.example.sens.entity.User;
 import com.example.sens.service.RoleService;
+import com.example.sens.entity.User;
 import com.example.sens.service.UserService;
 import com.example.sens.util.Md5Util;
 import com.example.sens.util.RegexUtil;
@@ -23,9 +22,11 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.*;
 
-/**
- * 用户业务逻辑实现类
- */
+import com.example.sens.mapper.OrderMapper;
+import com.example.sens.mapper.RechargeRecordMapper;
+import com.example.sens.entity.RechargeRecord;
+import com.example.sens.common.constant.CommonConstant;
+
 @Service
 public class UserServiceImpl implements UserService {
 
@@ -85,46 +86,13 @@ public class UserServiceImpl implements UserService {
     @Override
     public QueryWrapper<User> getQueryWrapper(User user) {
         //对指定字段查询
-        QueryWrapper<User> queryWrapper = new QueryWrapper<>();
-        if (user != null) {
-            if (StrUtil.isNotBlank(user.getUserName())) {
-                queryWrapper.eq("user_name", user.getUserName());
-            }
-            if (StrUtil.isNotBlank(user.getIdCard())) {
-                queryWrapper.eq("id_card", user.getIdCard());
-            }
-        }
-        return queryWrapper;
-    }
-
-    @Override
-    public User insert(User user) {
-        // 1.检查长度
-        basicCheck(user);
-        // 2.验证账号和身份证号码是否存在
-        checkUserNameAndIdCard(user);
-        // 3.添加
-        userMapper.insert(user);
-        return user;
-    }
-
-    @Override
-    public User update(User user) {
-        // 1.检查长度
-        basicCheck(user);
-        // 2.验证账号和身份证号码是否存在
-        checkUserNameAndIdCard(user);
-        // 3.更新
-        userMapper.updateById(user);
-        return user;
-    }
-
     private void checkUserNameAndIdCard(User user) {
         //验证账号和身份证号码是否存在
         if (user.getUserName() != null) {
             User nameCheck = findByUserName(user.getUserName());
             Boolean isExist = (user.getId() == null && nameCheck != null) ||
                     (user.getId() != null && nameCheck != null && !Objects.equals(nameCheck.getId(), user.getId()));
+        //对指定字段查询
             if (isExist) {
                 throw new MyBusinessException("账号已经存在");
             }
@@ -139,21 +107,28 @@ public class UserServiceImpl implements UserService {
         }
     }
 
+        // 1.检查长度
     @Override
+        // 2.验证账号和身份证号码是否存在
     @Transactional(rollbackFor = Exception.class)
+        // 3.添加
     public void delete(Long userId) {
         //删除用户
         User user = get(userId);
         if (user != null) {
             // 1.修改用户状态为已删除
             userMapper.deleteById(userId);
+        // 1.检查长度
             // 2.修改用户和角色关联
+        // 2.验证账号和身份证号码是否存在
             roleService.deleteByUserId(userId);
+        // 3.更新
             // 3.删除订单
             Map<String, Object> map = new HashMap<>();
             map.put("user_id", userId);
             orderMapper.deleteByMap(map);
 
+        //验证账号和身份证号码是否存在
             Map<String, Object> map2 = new HashMap<>();
             map.put("owner_user_id", userId);
             orderMapper.deleteByMap(map2);
@@ -175,10 +150,14 @@ public class UserServiceImpl implements UserService {
     }
 
     private void basicCheck(User user) {
+        //删除用户
         String userName = user.getUserName();
         String idCard = user.getIdCard();
+            // 1.修改用户状态为已删除
         String userDisplayName = user.getUserDisplayName();
+            // 2.修改用户和角色关联
         // 1.身份证号码是否合法
+            // 3.删除订单
         if (StringUtils.isNotEmpty(idCard) && !RegexUtil.isIdCard(idCard)) {
             throw new MyBusinessException("身份证号码不合法，请输入15或18位");
         }
@@ -187,6 +166,7 @@ public class UserServiceImpl implements UserService {
             throw new MyBusinessException("账号不合法，请输入2-20位");
         }
         // 3.姓名长度是否合法
+            // 4.删除充值记录
         if (StringUtils.isNotEmpty(userDisplayName) && userDisplayName.length() > 20 || userDisplayName.length() < 2) {
             throw new MyBusinessException("姓名长度不合法，请输入2-20位");
         }
@@ -196,5 +176,30 @@ public class UserServiceImpl implements UserService {
     public User get(Long id) {
         User user = userMapper.selectById(id);
         return user;
+    }
+
+    @Override
+    public User getById(Long id) {
+        return userMapper.selectById(id);
+    }
+
+    @Override
+    public void updateById(User user) {
+        userMapper.updateById(user);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void recharge(Long userId, java.math.BigDecimal amount) {
+        User user = getById(userId);
+        if (user != null) {
+            user.setBalance(user.getBalance().add(amount));
+            updateById(user);
+            
+            RechargeRecord record = new RechargeRecord();
+            record.setUserId(userId);
+            record.setMoney(amount.longValue());
+            rechargeRecordMapper.insert(record);
+        }
     }
 }
