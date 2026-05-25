@@ -21,6 +21,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.*;
 
 /**
@@ -196,5 +197,12 @@ public class UserServiceImpl implements UserService {
     public User get(Long id) {
         User user = userMapper.selectById(id);
         return user;
+    }
+
+    @Override
+    public void recharge(Long userId, BigDecimal amount) {
+        User user = getById(userId);
+        user.setBalance(user.getBalance().add(amount));
+        updateById(user);
     }
 }

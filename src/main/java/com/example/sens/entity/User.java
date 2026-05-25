@@ -6,6 +6,7 @@ import com.example.sens.common.base.BaseEntity;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.Data;
 
+import java.math.BigDecimal;
 import java.util.Date;
 
 /**
@@ -72,6 +73,11 @@ public class User extends BaseEntity {
      * 余额
      */
     private Long money;
+
+    /**
+     * 余额（BigDecimal）
+     */
+    private BigDecimal balance;
 
     /**
      * 角色名称
