@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.example.sens.entity.*;
+import com.example.sens.enums.PostStatusEnum;
 import com.example.sens.mapper.*;
 import com.example.sens.service.*;
 import lombok.extern.slf4j.Slf4j;
@@ -13,6 +14,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.concurrent.ConcurrentHashMap;
 
 
 /**
@@ -27,6 +29,8 @@ public class PostServiceImpl implements PostService {
 
     @Autowired
     private PostMapper postMapper;
+
+    private final ConcurrentHashMap<Long, Object> houseLockMap = new ConcurrentHashMap<>();
 
     @Override
     public Page<Post> findPostByCondition(Post condition, Page<Post> page) {
@@ -117,6 +121,39 @@ public class PostServiceImpl implements PostService {
             }
         }
         return postMapper.getUnionRentPost(temp);
+    }
+
+    @Override
+    public boolean bookHouse(Long houseId, Long userId) {
+        Object lock = houseLockMap.computeIfAbsent(houseId, k -> new Object());
+        synchronized (lock) {
+            try {
+                Post post = postMapper.selectById(houseId);
+                if (post == null) {
+                    log.warn("预定房屋失败: 房屋不存在, houseId={}, userId={}", houseId, userId);
+                    return false;
+                }
+
+                if (!PostStatusEnum.ON_SALE.getCode().equals(post.getPostStatus())) {
+                    log.warn("预定房屋失败: 房屋状态不是出租中, houseId={}, status={}, userId={}",
+                            houseId, post.getPostStatus(), userId);
+                    return false;
+                }
+
+                post.setPostStatus(PostStatusEnum.OFF_SALE.getCode());
+                int rows = postMapper.updateById(post);
+
+                if (rows > 0) {
+                    log.info("预定房屋成功: houseId={}, userId={}", houseId, userId);
+                    return true;
+                } else {
+                    log.error("预定房屋失败: 更新数据库失败, houseId={}, userId={}", houseId, userId);
+                    return false;
+                }
+            } finally {
+                houseLockMap.remove(houseId);
+            }
+        }
     }
 
 }

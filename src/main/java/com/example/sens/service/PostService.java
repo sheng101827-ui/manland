@@ -54,4 +54,13 @@ public interface PostService extends BaseService<Post, Long> {
      * @return
      */
     List<Post> getUnionRentPost(Post post);
+
+    /**
+     * 预定房屋
+     *
+     * @param houseId 房屋ID
+     * @param userId 用户ID
+     * @return 预定是否成功
+     */
+    boolean bookHouse(Long houseId, Long userId);
 }
