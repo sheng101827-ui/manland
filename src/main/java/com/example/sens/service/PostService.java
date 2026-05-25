@@ -54,4 +54,3 @@ public interface PostService extends BaseService<Post, Long> {
      * @return
      */
     List<Post> getUnionRentPost(Post post);
-}

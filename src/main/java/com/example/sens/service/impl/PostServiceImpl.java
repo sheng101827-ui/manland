@@ -5,7 +5,6 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.example.sens.entity.*;
-import com.example.sens.mapper.*;
 import com.example.sens.service.*;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -13,7 +12,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
-
 
 /**
  * <pre>
@@ -30,8 +28,6 @@ public class PostServiceImpl implements PostService {
 
     @Override
     public Page<Post> findPostByCondition(Post condition, Page<Post> page) {
-        List<Post> postList = postMapper.findPostByCondition(condition, page);
-        return page.setRecords(postList);
     }
 
     @Override

@@ -295,5 +295,18 @@ public class PostController extends BaseController {
         return "admin/admin_post_edit";
     }
 
+    /**
+     * 添加房屋
+     *
+     * @param post 房屋对象
+     */
+    @PostMapping(value = "/addHouse")
+    @ResponseBody
+    public JsonResult addHouse(@RequestBody Post post) {
+        post.setCreateTime(new Date());
+        postService.insertOrUpdate(post);
+        return JsonResult.success("发布成功");
+    }
+
 
 }

@@ -1,0 +1,61 @@
+diff --git a/src/main/java/com/example/sens/controller/admin/PostController.java b/src/main/java/com/example/sens/controller/admin/PostController.java
+index 2b09e3b..1c60571 100755
+--- a/src/main/java/com/example/sens/controller/admin/PostController.java
++++ b/src/main/java/com/example/sens/controller/admin/PostController.java
+@@ -295,5 +295,18 @@ public class PostController extends BaseController {
+         return "admin/admin_post_edit";
+     }
+ 
++    /**
++     * 添加房屋
++     *
++     * @param post 房屋对象
++     */
++    @PostMapping(value = "/addHouse")
++    @ResponseBody
++    public JsonResult addHouse(@RequestBody Post post) {
++        post.setCreateTime(new Date());
++        postService.insertOrUpdate(post);
++        return JsonResult.success("发布成功");
++    }
++
+ 
+ }
+diff --git a/src/main/java/com/example/sens/service/PostService.java b/src/main/java/com/example/sens/service/PostService.java
+index 562e429..e130bdb 100755
+--- a/src/main/java/com/example/sens/service/PostService.java
++++ b/src/main/java/com/example/sens/service/PostService.java
+@@ -54,4 +54,3 @@ public interface PostService extends BaseService<Post, Long> {
+      * @return
+      */
+     List<Post> getUnionRentPost(Post post);
+-}
+diff --git a/src/main/java/com/example/sens/service/impl/PostServiceImpl.java b/src/main/java/com/example/sens/service/impl/PostServiceImpl.java
+index 0361e6f..2ac6392 100755
+--- a/src/main/java/com/example/sens/service/impl/PostServiceImpl.java
++++ b/src/main/java/com/example/sens/service/impl/PostServiceImpl.java
+@@ -5,7 +5,6 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+ import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+ import com.example.sens.entity.*;
+-import com.example.sens.mapper.*;
+ import com.example.sens.service.*;
+ import lombok.extern.slf4j.Slf4j;
+ import org.springframework.beans.factory.annotation.Autowired;
+@@ -14,7 +13,6 @@ import org.springframework.transaction.annotation.Transactional;
+ 
+ import java.util.List;
+ 
+-
+ /**
+  * <pre>
+  *     房屋业务逻辑实现类
+@@ -30,8 +28,6 @@ public class PostServiceImpl implements PostService {
+ 
+     @Override
+     public Page<Post> findPostByCondition(Post condition, Page<Post> page) {
+-        List<Post> postList = postMapper.findPostByCondition(condition, page);
+-        return page.setRecords(postList);
+     }
+ 
+     @Override
